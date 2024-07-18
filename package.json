@@ -1,18 +1,18 @@
 {
-  "name": "tukride-backend",
+  "name": "tukride",
   "version": "1.0.0",
-  "description": "",
+  "description": "Graduation project",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon app.js"
   },
-  "keywords": [],
-  "author": "",
+  "author": "Ahmed Adel",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.19.2",
-    "mongoose": "^8.4.4",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
     "nodemon": "^3.1.4"
   }
 }

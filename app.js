@@ -1,23 +1,19 @@
 const express = require('express');
 const app = express();
 
-// app.use(express.json());
-app.use('/api/test', (req, res) => {
-  res.send(`Hello from the Tukdrive app...`);
-});
+const userRoute = require('./routes/userRoutes');
+const driverRoute = require('./routes/driverRoutes');
+// const driverRoute = require('./routes/driverRoutes');
 
-// Routes
-app.use('/api/drivers', driverRouter);
-app.use('/api/users', userRouter);
+app.use(express.json());
 
-app.use('*', (req, res) => {
-  res.status(404).json({
-    status: 'fial',
-    message: `can't find ${req.originalUrl} on this server !`,
-  });
-});
-
+// app.use('/', (req, res) => {
+//   res.send('Hello World !');
+// });
+// ROUTES
+app.use('/user', userRoute);
+app.use('/driver', driverRoute);
 const PORT = 8080;
-app.listen(PORT, () => {
-  console.log(`TukRide is running on port ${PORT}...`);
+app.listen(PORT, (req, res) => {
+  console.log(`Server is running on port ${PORT}..`);
 });
