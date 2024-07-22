@@ -1,9 +1,9 @@
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 
-exports.signupUser = (req, res) => {
-  res.status(200).json({ message: 'User signupUser not implemented yet.' });
-};
+exports.signupUser = async (req, res) => {};
 
 exports.loginUser = (req, res) => {
   res.status(200).json({ message: 'User login not implemented yet.' });

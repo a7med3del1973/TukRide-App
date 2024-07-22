@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const rideSchema = new Schema(
+const rideSchema = new mongoose.Schema(
   {
     user: {
       type: Schema.Types.ObjectId,
@@ -54,5 +54,5 @@ const rideSchema = new Schema(
   { timestamps: true }
 );
 
-const rideModel = mongoose.model('Ride', rideSchema);
-module.exports = rideModel;
+const Ride = mongoose.model('Ride', rideSchema);
+module.exports = Ride;
