@@ -6,11 +6,12 @@ const dbURL =
 mongoose
   .connect(dbURL, {
     useNewUrlParser: true,
+    useUnifiedTopology: true,
   })
   .then(() => console.log('DB connection successful !'))
   .catch((err) => console.log('DB connection error : ', err));
 
 const PORT = 8080;
 app.listen(PORT, (req, res) => {
-  console.log(`Server is running on port ${PORT} ..`);
+  console.log(`Server is running on port ${PORT} .`);
 });
