@@ -15,7 +15,7 @@ TukRide is a booking mobile app built using MongoDB, Express.js, Flutter, and No
 
 ## About
 
-TukRide is designed to offer a seamless experience for users and drivers in the taxi booking industry. The app provides an intuitive interface for users to book rides and track their trips. For drivers, it offers tools to manage bookings and navigate to user locations efficiently.
+TukRide is designed to offer a seamless experience for users and drivers in the tuktuk booking industry. The app provides an intuitive interface for users to book rides and track their trips. For drivers, it offers tools to manage bookings and navigate to user locations efficiently.
 
 ## Features
 
