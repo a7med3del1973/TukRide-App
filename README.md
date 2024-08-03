@@ -23,6 +23,7 @@ TukRide is designed to offer a seamless experience for users and drivers in the 
 - Driver registration and authentication
 - Real-time ride booking and tracking
 - Payment processing
+**🛡️ Secure and Efficient Payment**: Designed with advanced security protocols to protect user data, ensuring a safe and seamless experience for both drivers and passengers.
 - Trip history and receipts
 - Driver ratings and reviews
 
