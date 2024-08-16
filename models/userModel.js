@@ -7,9 +7,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'default profile.png',
   },
-  username: {
+  name: {
     type: String,
     required: [true, 'A user must have a name '],
+    unique: true,
+    locawercase: true,
   },
   useremail: {
     type: String,

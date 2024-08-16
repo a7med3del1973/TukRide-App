@@ -18,6 +18,7 @@ app.use('/driver', driverRoute);
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server !`));
 });
+
 app.use(glopalErrorHandler);
 
 module.exports = app;

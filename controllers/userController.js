@@ -1,71 +1,184 @@
 const fs = require('fs');
+const multer = require('multer');
+const multerStorage = multer.memoryStorage();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
+const Ride = require('../models/rideModel');
+const catchAsync = require('../utils/catchAsync');
 
-exports.signupUser = async (req, res) => {};
+exports.updateMe = catchAsync(async (req, res, next) => {
+  if (req.body.password || req.body.passwordConfirm) {
+    return next(
+      new AppError(
+        'This route is not for password updates. Please use /updatePassword.',
+        400
+      )
+    );
+  }
 
-exports.loginUser = (req, res) => {
-  res.status(200).json({ message: 'User login not implemented yet.' });
-};
+  // Prepare data for updating
+  const updateData = {
+    username: req.body.username,
+    useremail: req.body.useremail,
+    userphone: req.body.userphone,
+  };
 
-exports.cancelRide = (req, res) => {
-  res.status(200).json({ message: 'User cancelRide not implemented yet.' });
-};
+  // Check if there's a new profile picture and update accordingly
+  if (req.file) {
+    updateData.profile = req.file.filename;
+  }
+
+  // Update user in the database
+  const updatedUser = await User.findByIdAndUpdate(req.user._id, updateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user: updatedUser,
+    },
+  });
+});
+
+exports.cancelRide = catchAsync(async (req, res, next) => {
+  const ride = await Ride.findById(req.params.rideId);
+
+  if (!ride) {
+    return next(new AppError('No ride found with that ID', 404));
+  }
+
+  if (ride.user.toString() !== req.user._id.toString()) {
+    return next(
+      new AppError('You do not have permission to cancel this ride', 403)
+    );
+  }
+
+  ride.status = 'canceled';
+  await ride.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: null,
+  });
+});
 
 // give rate for the driver
-exports.rateRide = (req, res) => {
-  res.status(200).json({ message: 'User rateRide not implemented yet.' });
-};
+exports.rateRide = catchAsync(async (req, res, next) => {
+  const ride = await Ride.findById(req.params.rideId);
+
+  if (!ride) {
+    return next(new AppError('No ride found with that ID', 404));
+  }
+
+  if (ride.user.toString() !== req.user._id.toString()) {
+    return next(
+      new AppError('You do not have permission to rate this ride', 403)
+    );
+  }
+  ride.rating = req.body.rating;
+  ride.review = req.body.review;
+  await ride.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: null,
+  });
+});
 // show all availables rides
-exports.availableRides = (req, res) => {
-  res.status(200).json({ message: 'User availableRides not implemented yet.' });
-};
+exports.availableRides = catchAsync(async (req, res, next) => {
+  const rides = await Ride.find({ status: 'available' });
+
+  res.status(200).json({
+    status: 'success',
+    results: rides.length,
+    data: {
+      rides,
+    },
+  });
+});
 // Book a ride
-exports.bookRide = (req, res) => {
-  res.status(200).json({ message: 'User bookRide not implemented yet.' });
-};
+exports.bookRide = catchAsync(async (req, res, next) => {
+  const ride = await Ride.findById(req.params.rideId);
 
-exports.updateUserProfile = (req, res) => {
-  res
-    .status(200)
-    .json({ message: 'User updateUserProfile not implemented yet.' });
-};
+  if (!ride) {
+    return next(new AppError('No ride found with that ID', 404));
+  }
 
-exports.getUserProfile = (req, res) => {
-  res.status(200).json({ message: 'User getUserProfile not implemented yet' });
-};
+  if (ride.status !== 'available') {
+    return next(new AppError('This ride is no longer available', 400));
+  }
+
+  ride.status = 'booked';
+  ride.user = req.user._id;
+  await ride.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      ride,
+    },
+  });
+});
+
+exports.getUserProfile = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user,
+    },
+  });
+});
 // Get user ride history
-exports.rideHistory = (req, res) => {
-  res.status(200).json({ message: 'User rideHistory not implemented yet.' });
+exports.rideHistory = catchAsync(async (req, res, next) => {
+  const rides = await Ride.find({ user: req.user._id, status: 'completed' });
+
+  res.status(200).json({
+    status: 'success',
+    results: rides.length,
+    data: {
+      rides,
+    },
+  });
+});
+
+exports.deleteMe = catchAsync(async (req, res, next) => {
+  await User.findByIdAndDelete(req.user._id);
+
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+});
+
+exports.resizeUserPhoto = catchAsync(async (req, res, next) => {
+  if (!req.file) return next();
+
+  req.file.filename = `user-${req.user._id}-${Date.now()}.jpeg`;
+
+  await sharp(req.file.buffer)
+    .resize(500, 500)
+    .toFormat('jpeg')
+    .jpeg({ quality: 90 })
+    .toFile(`public/img/users/${req.file.filename}`);
+
+  next();
+});
+
+const multerFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Not an image! Please upload only images.', 400), false);
+  }
 };
 
-exports.deleteMe = (req, res) => {
-  res.status(200).json({ message: 'User deleteMe not implemented yet.' });
-};
+const upload = multer({
+  storage: multerStorage,
+  fileFilter: multerFilter,
+});
 
-exports.resizeUserPhoto = (req, res) => {
-  res
-    .status(200)
-    .json({ message: 'User resizeUserPhoto not implemented yet.' });
-};
-
-exports.uploadUserPhoto = (req, res) => {
-  res
-    .status(200)
-    .json({ message: 'User uploadUserPhoto not implemented yet.' });
-};
-
-exports.updatePassword = (req, res) => {
-  res.status(200).json({ message: 'User updatePassword not implemented yet.' });
-};
-exports.resetPassword = (req, res) => {
-  res.status(200).json({ message: 'User resetPassword not implemented yet.' });
-};
-exports.forgotPassword = (req, res) => {
-  res.status(200).json({ message: 'User forgotPassword not implemented yet.' });
-};
-
-exports.logout = (req, res) => {
-  res.status(200).json({ message: 'User logout not implemented yet .' });
-};
+exports.uploadUserPhoto = upload.single('photo');

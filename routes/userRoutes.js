@@ -1,31 +1,38 @@
 const express = require('express');
 const userController = require('../controllers/userController');
+const authController = require('../controllers/authController');
 
 const router = express.Router();
 // Password management routes
-router.post('/forgotPassword', userController.forgotPassword);
-router.patch('/resetPassword/:token', userController.resetPassword);
-router.patch('/updateMyPassword', userController.updatePassword);
+router.post('/forgotPassword', authController.forgotPasswordUser);
+router.patch('/resetPassword/:token', authController.resetPasswordUser);
+router.patch(
+  '/updateMyPassword',
+  authController.protect,
+  authController.updatePasswordUser
+);
 
 // Authentication routes
-router.post('/signup', userController.signupUser);
-router.post('/login', userController.loginUser);
-router.get('/logout', userController.logout);
+router.post('/signup', authController.signupUser);
+router.post('/login', authController.loginUser);
+router.get('/logout', authController.protect, authController.logout);
 //
 // User profile routes
+//
+router.use(authController.protect);
+router.get('/profile', userController.getUserProfile);
 router.patch(
   '/updateMe',
   userController.uploadUserPhoto,
   userController.resizeUserPhoto,
-  userController.updateUserProfile
+  userController.updateMe
 );
 router.delete('/deleteMe', userController.deleteMe);
-router.get('/profile', userController.getUserProfile);
 
 // Ride management routes
+router.get('/availableRides', userController.availableRides);
 router.post('/bookRide', userController.bookRide);
 router.delete('/cancelRide/:rideId', userController.cancelRide);
-router.get('/availableRides', userController.availableRides);
 router.get('/rideHistory', userController.rideHistory);
 
 // Ride rating route
