@@ -8,7 +8,10 @@ const { default: mongoose } = require('mongoose');
 const app = express();
 app.use(morgan('dev'));
 app.use(express.json());
+const cookieParser = require('cookie-parser');
 
+// Use cookie-parser middleware
+app.use(cookieParser());
 // app.use('/', (req, res) => {
 //   res.send('Hello World !');
 // });

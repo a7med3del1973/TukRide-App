@@ -16,7 +16,7 @@ router.patch(
   authController.updatePasswordDriver
 );
 
-router.post('/register', authController.signupDriver);
+router.post('/signup', authController.signupDriver);
 router.post('/login', authController.loginDriver);
 router.get('/logout', authController.logout);
 

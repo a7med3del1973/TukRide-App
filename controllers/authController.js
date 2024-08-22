@@ -6,6 +6,8 @@ const Driver = require('../models/driverModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const sendEmail = require('../utils/email');
+const bcrypt = require('bcryptjs');
+const jwtBlacklist = require('../utils/jwtBlacklist');
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -96,28 +98,36 @@ exports.loginDriver = catchAsync(async (req, res, next) => {
 });
 
 // User/Driver logout
+
 exports.logout = (req, res) => {
+  // Check if the cookie exists
   const token = req.cookies.jwt;
+
   if (!token) {
     return res.status(400).json({
       status: 'error',
-      message: 'You are already logged out !',
+      message: 'You are already logged out!',
     });
   }
+
   jwtBlacklist.add(token);
-  res.cookie('jwt', 'loggedout', {
-    expires: new Date(Date.now() + 10 * 1000),
+
+  res.cookie('jwt', '', {
+    expires: new Date(0),
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
   });
+
   res.status(200).json({
     status: 'success',
-    message: 'You are now logged out !',
+    message: 'You are now logged out!',
   });
 };
 
 // Protect routes for both Users and Drivers
 exports.protect = catchAsync(async (req, res, next) => {
   let token;
+
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
@@ -127,8 +137,16 @@ exports.protect = catchAsync(async (req, res, next) => {
     token = req.cookies.jwt;
   }
 
+  // Allow access to specific routes even if the user is logged out
+  const allowedRoutes = ['/forgotPassword', '/verifyCode', '/resetPassword'];
   if (!token || token === 'loggedout') {
-    return next(new AppError('You are logged out! Please log in again.', 401));
+    if (allowedRoutes.includes(req.path)) {
+      return next();
+    } else {
+      return next(
+        new AppError('You are logged out! Please log in again.', 401)
+      );
+    }
   }
 
   if (jwtBlacklist.has(token)) {
@@ -159,33 +177,186 @@ exports.protect = catchAsync(async (req, res, next) => {
 // Forgot and reset password functions can be extended similarly for Drivers as for Users.
 // Forgot password for User
 exports.forgotPasswordUser = catchAsync(async (req, res, next) => {
+  // 1) Get user by email
   const user = await User.findOne({ useremail: req.body.useremail });
   if (!user) {
-    return next(new AppError('There is no user with that email address', 404));
+    return next(
+      new AppError(
+        `There is no user with that email ${req.body.useremail}`,
+        404
+      )
+    );
   }
 
-  const resetToken = user.createPasswordResetToken();
-  await user.save({ validateBeforeSave: false });
+  // 2) Generate and hash the reset code
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedResetCode = crypto
+    .createHash('sha256')
+    .update(resetCode)
+    .digest('hex');
+  console.log('Generated Reset Code:', resetCode);
+  console.log('Hashed Reset Code:', hashedResetCode);
 
-  const resetURL = `${req.protocol}://${req.get(
-    'host'
-  )}/user/resetPassword/${resetToken}`;
-  const message = `Forgot your password? Submit a PATCH request with your new password to: ${resetURL}.\nIf you didn't forget your password, please ignore this email.`;
+  // Set the expiration time (10 minutes from now)
+  user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  user.passwordResetVerified = false;
+  user.passwordResetCode = hashedResetCode;
+
+  // Log the current time and expiration time for debugging
+  console.log('Current Time:', new Date().toISOString());
+  console.log(
+    'Password Reset Expires At:',
+    new Date(user.passwordResetExpires).toISOString()
+  );
+
+  // Save the user and log the saved data
+  await user.save({ validateBeforeSave: false });
+  const savedUser = await User.findById(user._id);
+  console.log(
+    'Saved User with Expiration Time:',
+    savedUser.passwordResetExpires
+  );
+
+  // 3) Send the reset code via email
+  const message = `Hi ${user.name},\nWe received a request to reset the password on your TukRide account.\n${resetCode}\nEnter this code to complete the reset.\nThanks for helping us keep your account secure.\nThe TukRide Team`;
 
   try {
     await sendEmail({
       email: user.useremail,
-      subject: 'Your password reset token (valid for 10 minutes)',
+      subject: 'Your password reset code (valid for 10 min)',
       message,
     });
 
     res.status(200).json({
       status: 'success',
-      message: 'Token sent to email!',
+      message: 'Verification code sent to email!',
     });
   } catch (err) {
-    user.passwordResetToken = undefined;
+    user.passwordResetCode = undefined;
     user.passwordResetExpires = undefined;
+    user.passwordResetVerified = undefined;
+
+    await user.save({ validateBeforeSave: false });
+    return next(
+      new AppError(
+        'There was an error sending the email. Try again later!',
+        500
+      )
+    );
+  }
+});
+
+// Verify the code and allow password reset
+exports.verifyPasswordResetCode = catchAsync(async (req, res, next) => {
+  const { resetCode } = req.body;
+
+  // 1) Hash the provided reset code
+  const hashedResetCode = crypto
+    .createHash('sha256')
+    .update(resetCode)
+    .digest('hex');
+  console.log('Reset Code Received:', req.body.resetCode);
+  console.log('Hashed Reset Code:', hashedResetCode);
+
+  // 2) Find the user with the hashed code and valid expiry time
+  const user = await User.findOne({
+    passwordResetCode: hashedResetCode,
+    passwordResetExpires: { $gt: Date.now() },
+  });
+  console.log('User from DB:', user);
+
+  if (!user) {
+    return next(
+      new AppError('Verification code is invalid or has expired', 400)
+    );
+  }
+
+  // 3) Mark the reset code as verified
+  user.passwordResetVerified = true;
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Code verified. You can now reset your password.',
+  });
+});
+
+// Reset password for User
+exports.resetPasswordUser = catchAsync(async (req, res, next) => {
+  const { useremail, newPassword, passwordConfirm } = req.body;
+
+  // Get user based on email
+  const user = await User.findOne({ useremail });
+  if (!user) {
+    return next(
+      new AppError(`There is no user with that email ${useremail}`, 404)
+    );
+  }
+
+  // Check if reset code was verified
+  if (!user.passwordResetVerified) {
+    return next(new AppError('Reset code not verified', 400));
+  }
+
+  // Check if passwords match
+  if (newPassword !== passwordConfirm) {
+    return next(new AppError('Passwords do not match', 400));
+  }
+
+  // Set the new password
+  user.password = newPassword;
+  user.passwordConfirm = undefined;
+  user.passwordResetCode = undefined;
+  user.passwordResetExpires = undefined;
+  user.passwordResetVerified = undefined;
+
+  await user.save();
+
+  // Log successful password reset
+  console.log(`Password successfully reset for user ${useremail}`);
+
+  // Generate token and send response
+  createSendToken(user, 200, res);
+});
+// Forgot password for Driver
+exports.forgotPasswordDriver = catchAsync(async (req, res, next) => {
+  const driver = await Driver.findOne({ driveremail: req.body.driveremail });
+  if (!driver) {
+    return next(
+      new AppError('There is no driver with that email address', 404)
+    );
+  }
+
+  // Generate a 6-digit verification code
+  const verificationCode = Math.floor(
+    100000 + Math.random() * 900000
+  ).toString();
+
+  // Hash and set the verification code with expiry
+  driver.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(verificationCode)
+    .digest('hex');
+  driver.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+
+  await driver.save({ validateBeforeSave: false });
+
+  const message = `Your password reset code is ${verificationCode}. This code is valid for 10 minutes.`;
+
+  try {
+    await sendEmail({
+      email: driver.useremail,
+      subject: 'Your password reset code',
+      message,
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Verification code sent to email!',
+    });
+  } catch (err) {
+    driver.passwordResetToken = undefined;
+    driver.passwordResetExpires = undefined;
     await user.save({ validateBeforeSave: false });
 
     return next(
@@ -197,87 +368,22 @@ exports.forgotPasswordUser = catchAsync(async (req, res, next) => {
   }
 });
 
-// Forgot password for Driver
-exports.forgotPasswordDriver = catchAsync(async (req, res, next) => {
-  const driver = await Driver.findOne({ driveremail: req.body.driveremail });
-  if (!driver) {
-    return next(
-      new AppError('There is no driver with that email address', 404)
-    );
-  }
-
-  const resetToken = driver.createPasswordResetToken();
-  await driver.save({ validateBeforeSave: false });
-
-  const resetURL = `${req.protocol}://${req.get(
-    'host'
-  )}/driver/resetPassword/${resetToken}`;
-  const message = `Forgot your password? Submit a PATCH request with your new password to: ${resetURL}.\nIf you didn't forget your password, please ignore this email.`;
-
-  try {
-    await sendEmail({
-      email: driver.driveremail,
-      subject: 'Your password reset token (valid for 10 minutes)',
-      message,
-    });
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Token sent to email!',
-    });
-  } catch (err) {
-    driver.passwordResetToken = undefined;
-    driver.passwordResetExpires = undefined;
-    await driver.save({ validateBeforeSave: false });
-
-    return next(
-      new AppError(
-        'There was an error sending the email. Try again later!',
-        500
-      )
-    );
-  }
-});
-
-// Reset password for User
-exports.resetPasswordUser = catchAsync(async (req, res, next) => {
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(req.params.token)
-    .digest('hex');
-
-  const user = await User.findOne({
-    passwordResetToken: hashedToken,
-    passwordResetExpires: { $gt: Date.now() },
-  });
-
-  if (!user) {
-    return next(new AppError('Token is invalid or has expired', 400));
-  }
-
-  user.password = req.body.password;
-  user.passwordConfirm = req.body.passwordConfirm;
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  await user.save();
-
-  createSendToken(user, 200, res);
-});
-
 // Reset password for Driver
 exports.resetPasswordDriver = catchAsync(async (req, res, next) => {
   const hashedToken = crypto
     .createHash('sha256')
-    .update(req.params.token)
+    .update(req.body.code)
     .digest('hex');
 
   const driver = await Driver.findOne({
-    passwordResetToken: hashedToken,
+    passwordResetToken: hashedCode,
     passwordResetExpires: { $gt: Date.now() },
   });
 
   if (!driver) {
-    return next(new AppError('Token is invalid or has expired', 400));
+    return next(
+      new AppError('Verification code is invalid or has expired', 400)
+    );
   }
 
   driver.password = req.body.password;

@@ -2,7 +2,7 @@ const app = require('./app');
 const mongoose = require('mongoose');
 
 const dbURL =
-  'mongodb+srv://a7med3del1973:nodejs123@cluster0.gkjci2o.mongodb.net/TukRide';
+  'mongodb+srv://a7med3del1973:nodejs123@cluster0.pnzxm.mongodb.net/TukRide';
 mongoose
   .connect(dbURL, {
     useNewUrlParser: true,

@@ -5,7 +5,9 @@ const authController = require('../controllers/authController');
 const router = express.Router();
 // Password management routes
 router.post('/forgotPassword', authController.forgotPasswordUser);
-router.patch('/resetPassword/:token', authController.resetPasswordUser);
+router.post('/verifyCode', authController.verifyPasswordResetCode);
+router.patch('/resetPassword', authController.resetPasswordUser);
+
 router.patch(
   '/updateMyPassword',
   authController.protect,
@@ -31,7 +33,7 @@ router.delete('/deleteMe', userController.deleteMe);
 
 // Ride management routes
 router.get('/availableRides', userController.availableRides);
-router.post('/bookRide', userController.bookRide);
+router.post('/bookRide/:rideId', userController.bookRide);
 router.delete('/cancelRide/:rideId', userController.cancelRide);
 router.get('/rideHistory', userController.rideHistory);
 

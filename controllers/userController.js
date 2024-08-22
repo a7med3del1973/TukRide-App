@@ -1,11 +1,13 @@
 const fs = require('fs');
 const multer = require('multer');
+const sharp = require('sharp');
 const multerStorage = multer.memoryStorage();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 const Ride = require('../models/rideModel');
 const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/appError');
 
 exports.updateMe = catchAsync(async (req, res, next) => {
   if (req.body.password || req.body.passwordConfirm) {
@@ -56,7 +58,7 @@ exports.cancelRide = catchAsync(async (req, res, next) => {
     );
   }
 
-  ride.status = 'canceled';
+  ride.status = 'cancelled';
   await ride.save();
 
   res.status(200).json({
@@ -78,13 +80,16 @@ exports.rateRide = catchAsync(async (req, res, next) => {
       new AppError('You do not have permission to rate this ride', 403)
     );
   }
+
   ride.rating = req.body.rating;
   ride.review = req.body.review;
   await ride.save();
 
   res.status(200).json({
     status: 'success',
-    data: null,
+    data: {
+      ride,
+    },
   });
 });
 // show all availables rides
@@ -110,6 +115,14 @@ exports.bookRide = catchAsync(async (req, res, next) => {
   if (ride.status !== 'available') {
     return next(new AppError('This ride is no longer available', 400));
   }
+  if (
+    !ride.startTime ||
+    !ride.fare ||
+    !ride.startLocation ||
+    !ride.endLocation
+  ) {
+    return next(new AppError('Missing required ride information', 400));
+  }
 
   ride.status = 'booked';
   ride.user = req.user._id;
@@ -125,6 +138,11 @@ exports.bookRide = catchAsync(async (req, res, next) => {
 
 exports.getUserProfile = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
   res.status(200).json({
     status: 'success',
     data: {
@@ -150,6 +168,7 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
 
   res.status(204).json({
     status: 'success',
+    message: 'The accoutn deleted succsfully .',
     data: null,
   });
 });

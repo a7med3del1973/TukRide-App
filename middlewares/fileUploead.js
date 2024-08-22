@@ -5,8 +5,7 @@ const path = require('path');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 
-// Configure multer storage
-
+// Configure multer storage to memory
 const multerStorage = multer.memoryStorage();
 
 // Filter to accept only images
@@ -31,13 +30,15 @@ exports.uploadDriverPhoto = upload.single('photo');
 exports.resizeDriverPhoto = catchAsync(async (req, res, next) => {
   if (!req.file) return next();
 
-  // Define file path and filename
+  // Define the file path and filename
   const filePath = path.join(__dirname, '../public/img/drivers');
   const fileName = `driver-${req.driver.id}-${Date.now()}.jpeg`;
 
-  // Ensure the directory exists
-  if (!fs.existsSync(filePath)) {
+  // Ensure the directory exists or create it
+  try {
     fs.mkdirSync(filePath, { recursive: true });
+  } catch (err) {
+    return next(new AppError('Failed to create directory', 500));
   }
 
   // Resize and save the image
