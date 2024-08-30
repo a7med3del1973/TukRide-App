@@ -9,6 +9,7 @@ const sendEmail = require('../utils/email');
 const bcrypt = require('bcryptjs');
 const jwtBlacklist = require('../utils/jwtBlacklist');
 
+
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN,
@@ -103,6 +104,7 @@ exports.logout = (req, res) => {
   // Check if the cookie exists
   const token = req.cookies.jwt;
 
+  
   if (!token) {
     return res.status(400).json({
       status: 'error',
@@ -110,12 +112,14 @@ exports.logout = (req, res) => {
     });
   }
 
+  
   jwtBlacklist.add(token);
 
+ 
   res.cookie('jwt', '', {
-    expires: new Date(0),
+    expires: new Date(0), 
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === 'production' 
   });
 
   res.status(200).json({
@@ -127,7 +131,7 @@ exports.logout = (req, res) => {
 // Protect routes for both Users and Drivers
 exports.protect = catchAsync(async (req, res, next) => {
   let token;
-
+  
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
@@ -143,9 +147,7 @@ exports.protect = catchAsync(async (req, res, next) => {
     if (allowedRoutes.includes(req.path)) {
       return next();
     } else {
-      return next(
-        new AppError('You are logged out! Please log in again.', 401)
-      );
+      return next(new AppError('You are logged out! Please log in again.', 401));
     }
   }
 
@@ -180,20 +182,12 @@ exports.forgotPasswordUser = catchAsync(async (req, res, next) => {
   // 1) Get user by email
   const user = await User.findOne({ useremail: req.body.useremail });
   if (!user) {
-    return next(
-      new AppError(
-        `There is no user with that email ${req.body.useremail}`,
-        404
-      )
-    );
+    return next(new AppError(`There is no user with that email ${req.body.useremail}`, 404));
   }
 
   // 2) Generate and hash the reset code
   const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const hashedResetCode = crypto
-    .createHash('sha256')
-    .update(resetCode)
-    .digest('hex');
+  const hashedResetCode = crypto.createHash('sha256').update(resetCode).digest('hex');
   console.log('Generated Reset Code:', resetCode);
   console.log('Hashed Reset Code:', hashedResetCode);
 
@@ -204,18 +198,12 @@ exports.forgotPasswordUser = catchAsync(async (req, res, next) => {
 
   // Log the current time and expiration time for debugging
   console.log('Current Time:', new Date().toISOString());
-  console.log(
-    'Password Reset Expires At:',
-    new Date(user.passwordResetExpires).toISOString()
-  );
+  console.log('Password Reset Expires At:', new Date(user.passwordResetExpires).toISOString());
 
   // Save the user and log the saved data
   await user.save({ validateBeforeSave: false });
   const savedUser = await User.findById(user._id);
-  console.log(
-    'Saved User with Expiration Time:',
-    savedUser.passwordResetExpires
-  );
+  console.log('Saved User with Expiration Time:', savedUser.passwordResetExpires);
 
   // 3) Send the reset code via email
   const message = `Hi ${user.name},\nWe received a request to reset the password on your TukRide account.\n${resetCode}\nEnter this code to complete the reset.\nThanks for helping us keep your account secure.\nThe TukRide Team`;
@@ -237,24 +225,18 @@ exports.forgotPasswordUser = catchAsync(async (req, res, next) => {
     user.passwordResetVerified = undefined;
 
     await user.save({ validateBeforeSave: false });
-    return next(
-      new AppError(
-        'There was an error sending the email. Try again later!',
-        500
-      )
-    );
+    return next(new AppError('There was an error sending the email. Try again later!', 500));
   }
 });
+
+
 
 // Verify the code and allow password reset
 exports.verifyPasswordResetCode = catchAsync(async (req, res, next) => {
   const { resetCode } = req.body;
 
   // 1) Hash the provided reset code
-  const hashedResetCode = crypto
-    .createHash('sha256')
-    .update(resetCode)
-    .digest('hex');
+  const hashedResetCode = crypto.createHash('sha256').update(resetCode).digest('hex');
   console.log('Reset Code Received:', req.body.resetCode);
   console.log('Hashed Reset Code:', hashedResetCode);
 
@@ -266,9 +248,7 @@ exports.verifyPasswordResetCode = catchAsync(async (req, res, next) => {
   console.log('User from DB:', user);
 
   if (!user) {
-    return next(
-      new AppError('Verification code is invalid or has expired', 400)
-    );
+    return next(new AppError('Verification code is invalid or has expired', 400));
   }
 
   // 3) Mark the reset code as verified
@@ -281,6 +261,10 @@ exports.verifyPasswordResetCode = catchAsync(async (req, res, next) => {
   });
 });
 
+
+
+
+
 // Reset password for User
 exports.resetPasswordUser = catchAsync(async (req, res, next) => {
   const { useremail, newPassword, passwordConfirm } = req.body;
@@ -288,9 +272,7 @@ exports.resetPasswordUser = catchAsync(async (req, res, next) => {
   // Get user based on email
   const user = await User.findOne({ useremail });
   if (!user) {
-    return next(
-      new AppError(`There is no user with that email ${useremail}`, 404)
-    );
+    return next(new AppError(`There is no user with that email ${useremail}`, 404));
   }
 
   // Check if reset code was verified
@@ -322,21 +304,14 @@ exports.resetPasswordUser = catchAsync(async (req, res, next) => {
 exports.forgotPasswordDriver = catchAsync(async (req, res, next) => {
   const driver = await Driver.findOne({ driveremail: req.body.driveremail });
   if (!driver) {
-    return next(
-      new AppError('There is no driver with that email address', 404)
-    );
+    return next(new AppError('There is no driver with that email address', 404));
   }
 
   // Generate a 6-digit verification code
-  const verificationCode = Math.floor(
-    100000 + Math.random() * 900000
-  ).toString();
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
   // Hash and set the verification code with expiry
-  driver.passwordResetToken = crypto
-    .createHash('sha256')
-    .update(verificationCode)
-    .digest('hex');
+  driver.passwordResetToken = crypto.createHash('sha256').update(verificationCode).digest('hex');
   driver.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
 
   await driver.save({ validateBeforeSave: false });
@@ -359,12 +334,7 @@ exports.forgotPasswordDriver = catchAsync(async (req, res, next) => {
     driver.passwordResetExpires = undefined;
     await user.save({ validateBeforeSave: false });
 
-    return next(
-      new AppError(
-        'There was an error sending the email. Try again later!',
-        500
-      )
-    );
+    return next(new AppError('There was an error sending the email. Try again later!', 500));
   }
 });
 
@@ -381,9 +351,7 @@ exports.resetPasswordDriver = catchAsync(async (req, res, next) => {
   });
 
   if (!driver) {
-    return next(
-      new AppError('Verification code is invalid or has expired', 400)
-    );
+    return next(new AppError('Verification code is invalid or has expired', 400));
   }
 
   driver.password = req.body.password;
