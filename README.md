@@ -45,7 +45,7 @@ TukRide is designed to offer a seamless experience for users and drivers in the 
 
     ```bash
     git clone https://github.com/yourusername/TukRide.git
-    cd TukRide/backend
+    cd TukRide
     ```
 
 2. Install the required npm packages:
