@@ -2,6 +2,7 @@ const express = require('express');
 const morgan = require('morgan');
 const userRoute = require('./routes/userRoutes');
 const driverRoute = require('./routes/driverRoutes');
+const chatRoute = require('./routes/chatRoutes');
 const AppError = require('./utils/appError');
 const glopalErrorHandler = require('./controllers/errorController');
 const { default: mongoose } = require('mongoose');
@@ -18,6 +19,7 @@ app.use(cookieParser());
 // ROUTES
 app.use('/user', userRoute);
 app.use('/driver', driverRoute);
+app.use('/chat', chatRoute);
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server !`));
 });
